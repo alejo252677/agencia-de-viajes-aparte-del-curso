@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Administración | Hotelia</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Hotelia<span>.</span></a>
+    <button id="logout" class="primary" hidden>Cerrar sesión</button>
+  </header>
+
+  <main class="content">
+    <h1>Panel de alojamientos</h1>
+    <p id="adminStatus" role="status">Verificando permisos...</p>
+
+    <section id="adminPanel" hidden>
+      <h2 id="manageHeading" hidden>Agregar o modificar un hotel</h2>
+
+      <form id="hotelForm" hidden style="max-width:650px;display:grid;gap:12px">
+        <input id="hotelId" type="hidden">
+
+        <label>Nombre
+          <input id="hotelName" maxlength="100" required>
+        </label>
+
+        <label>Ciudad
+          <input id="hotelCity" maxlength="100" required>
+        </label>
+
+        <label>Descripción
+          <textarea id="hotelDescription" maxlength="1000"
+            required style="min-height:90px"></textarea>
+        </label>
+
+        <label>Precio por noche (COP)
+          <input id="hotelPrice" type="number"
+            min="1000" max="100000000" required>
+        </label>
+
+        <label>Calificación (0 a 5)
+          <input id="hotelRating" type="number"
+            min="0" max="5" step="0.1" value="4.5" required>
+        </label>
+
+        <label>URL de fotografía
+          <input id="hotelImage" type="url" maxlength="500"
+            placeholder="https://ejemplo.com/hotel.jpg">
+        </label>
+
+        <button class="primary" type="submit">Guardar hotel</button>
+        <button id="cancelEdit" type="button">Cancelar edición</button>
+      </form>
+
+      <h2>Alojamientos publicados</h2>
+      <div id="adminHotels" class="hotel-grid"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    const status = document.querySelector("#adminStatus");
+    const panel = document.querySelector("#adminPanel");
+    const form = document.querySelector("#hotelForm");
+    const hotelList = document.querySelector("#adminHotels");
+    const manageHeading = document.querySelector("#manageHeading");
+    const logoutButton = document.querySelector("#logout");
+
+    let supabase;
+    let token = "";
+    let canManageHotels = false;
+
+    async function initialize() {
+      const configResponse = await fetch("/api/config");
+      if (!configResponse.ok) {
+        throw new Error("No se pudo cargar la configuración del sitio.");
+      }
+
+      const config = await configResponse.json();
+      if (config.supabaseAuthConfigured &&
+          config.supabaseUrl && config.supabasePublishableKey) {
+        const { createClient } = await import(
+          "https://esm.sh/@supabase/supabase-js@2"
+        );
+        supabase = createClient(
+          config.supabaseUrl,
+          config.supabasePublishableKey
+        );
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          location.replace("/login.html?next=admin");
+          return;
+        }
+
+        token = session.access_token;
+        logoutButton.hidden = false;
+
+        const response = await fetch("/api/admin/me", {
+          headers: { Authorization: "Bearer " + token }
+        });
+
+        if (response.status === 401) {
+          await supabase.auth.signOut();
+          location.replace("/login.html?next=admin");
+          return;
+        }
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          status.textContent = result.error || "Este correo no tiene acceso al panel.";
+          return;
+        }
+
+        canManageHotels = true;
+      } else {
+        status.textContent = "El inicio de sesión no está configurado.";
+        return;
+      }
+
+      panel.hidden = false;
+      form.hidden = false;
+      manageHeading.hidden = false;
+      status.textContent = "Acceso autorizado. Puedes consultar y administrar los alojamientos.";
+      await loadHotels();
+    }
+
+    async function request(url, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: "Bearer " + token } : {}),
+          ...options.headers
+        }
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || "La operación no se pudo completar.");
+      }
+
+      return result;
+    }
+
+    async function loadHotels() {
+      const hotels = await request("/api/admin/hotels");
+      hotelList.replaceChildren();
+
+      if (!hotels.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "Todavía no hay alojamientos publicados.";
+        hotelList.append(empty);
+        return;
+      }
+
+      hotels.forEach(hotel => {
+        const card = document.createElement("article");
+        card.className = "hotel-card";
+
+        if (hotel.image_url) {
+          const image = document.createElement("img");
+          image.src = hotel.image_url;
+          image.alt = `Fotografía de ${hotel.name}`;
+          image.loading = "lazy";
+          image.addEventListener("error", () => {
+            image.removeAttribute("src");
+            image.alt = "Imagen no disponible";
+          }, { once: true });
+          card.append(image);
+        }
+
+        const info = document.createElement("div");
+        info.className = "hotel-info";
+
+        const title = document.createElement("h3");
+        title.textContent = hotel.name;
+
+        const city = document.createElement("p");
+        city.textContent = hotel.city;
+
+        const price = document.createElement("p");
+        price.textContent = `${hotel.price} COP por noche`;
+
+        const description = document.createElement("p");
+        description.textContent = hotel.description || "Descripción no disponible.";
+
+        const rating = document.createElement("p");
+        rating.textContent = `Calificación: ${Number(hotel.rating).toFixed(1)} / 5`;
+
+        info.append(title, city, description, price, rating);
+
+        if (canManageHotels) {
+          const edit = document.createElement("button");
+          edit.className = "primary";
+          edit.textContent = "Editar";
+          edit.addEventListener("click", () => {
+            document.querySelector("#hotelId").value = hotel.id;
+            document.querySelector("#hotelName").value = hotel.name;
+            document.querySelector("#hotelCity").value = hotel.city;
+            document.querySelector("#hotelDescription").value = hotel.description;
+            document.querySelector("#hotelPrice").value = hotel.price;
+            document.querySelector("#hotelRating").value = hotel.rating;
+            document.querySelector("#hotelImage").value = hotel.image_url || "";
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          });
+
+          const remove = document.createElement("button");
+          remove.textContent = "Eliminar";
+          remove.addEventListener("click", async () => {
+            if (!confirm(`¿Eliminar ${hotel.name}?`)) return;
+
+            try {
+              await request(`/api/admin/hotels/${hotel.id}`, {
+                method: "DELETE"
+              });
+              await loadHotels();
+            } catch (error) {
+              status.textContent = error.message;
+            }
+          });
+
+          info.append(edit, remove);
+        }
+
+        card.append(info);
+        hotelList.append(card);
+      });
+    }
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+
+      const id = document.querySelector("#hotelId").value;
+
+      const hotel = {
+        name: document.querySelector("#hotelName").value.trim(),
+        city: document.querySelector("#hotelCity").value.trim(),
+        description: document.querySelector("#hotelDescription").value.trim(),
+        price: Number(document.querySelector("#hotelPrice").value),
+        rating: Number(document.querySelector("#hotelRating").value),
+        image_url: document.querySelector("#hotelImage").value.trim() || null
+      };
+
+      try {
+        await request(
+          id ? `/api/admin/hotels/${id}` : "/api/admin/hotels",
+          {
+            method: id ? "PATCH" : "POST",
+            body: JSON.stringify(hotel)
+          }
+        );
+
+        form.reset();
+        document.querySelector("#hotelId").value = "";
+        status.textContent = "Hotel guardado correctamente.";
+        await loadHotels();
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    });
+
+    document.querySelector("#cancelEdit").addEventListener("click", () => {
+      form.reset();
+      document.querySelector("#hotelId").value = "";
+    });
+
+    document.querySelector("#logout").addEventListener("click", async () => {
+      if (supabase) await supabase.auth.signOut();
+      location.reload();
+    });
+
+    initialize().catch(error => {
+      status.textContent = "No se pudo verificar el acceso.";
+      console.error(error);
+    });
+  </script>
+</body>
+</html>

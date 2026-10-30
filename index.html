@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explora hoteles de ejemplo por país y ciudad en América, con precios ilustrativos, imágenes y enlaces a Google Maps.">
+  <title>Hotelia | Planea tu próximo viaje</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./scripts.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./index.html">Hotelia<span>.</span></a>
+    <nav aria-label="Navegación principal">
+      <a href="#catalogo">Explorar viajes</a>
+      <a href="#reservaciones">Reservaciones <span id="navCartCount">0</span></a>
+      <a href="./login.html">Mi cuenta</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">ALOJAMIENTOS · MOVILIDAD · VUELOS</p>
+      <h1>Tu próximo viaje empieza aquí.</h1>
+      <p>Planea cada etapa: hospedaje, auto, vuelo y traslado al aeropuerto.</p>
+
+      <div class="service-switcher" role="group" aria-label="Elige un servicio">
+        <button class="service-tab is-active" type="button" data-service="hotel" aria-pressed="true">Hospedaje</button>
+        <button class="service-tab" type="button" data-service="car" aria-pressed="false">Alquiler de autos</button>
+        <button class="service-tab" type="button" data-service="flight" aria-pressed="false">Pasajes de avión</button>
+        <button class="service-tab" type="button" data-service="taxi" aria-pressed="false">Taxi de aeropuerto</button>
+      </div>
+
+      <form id="searchForm" class="search">
+        <label id="routeLabel" for="destination">Destino
+          <input id="destination" placeholder="Ej. Tokio, Japón" autocomplete="off">
+        </label>
+        <label id="airportField" for="airport" hidden>Aeropuerto de recogida
+          <select id="airport">
+            <option value="Bogotá — El Dorado (BOG)">Bogotá — El Dorado (BOG)</option>
+            <option value="Medellín — José María Córdova (MDE)">Medellín — José María Córdova (MDE)</option>
+            <option value="Cali — Alfonso Bonilla Aragón (CLO)">Cali — Alfonso Bonilla Aragón (CLO)</option>
+            <option value="Cartagena — Rafael Núñez (CTG)">Cartagena — Rafael Núñez (CTG)</option>
+            <option value="Barranquilla — Ernesto Cortissoz (BAQ)">Barranquilla — Ernesto Cortissoz (BAQ)</option>
+            <option value="Bucaramanga — Palonegro (BGA)">Bucaramanga — Palonegro (BGA)</option>
+          </select>
+        </label>
+        <label id="startDateLabel" for="dateStart">Entrada
+          <input id="dateStart" type="date" required>
+        </label>
+        <label id="endDateLabel" for="dateEnd">Salida
+          <input id="dateEnd" type="date" required>
+        </label>
+        <label id="pickupTimeField" for="pickupTime" hidden>Hora de recogida
+          <input id="pickupTime" type="time">
+        </label>
+        <label id="arrivalTimeField" for="arrivalTime" hidden>Hora de llegada / devolución
+          <input id="arrivalTime" type="time">
+        </label>
+        <label id="guestsField" for="guests">Viajeros
+          <select id="guests">
+            <option value="1">1 viajero</option>
+            <option value="2" selected>2 viajeros</option>
+            <option value="3">3 viajeros</option>
+            <option value="4">4 viajeros</option>
+            <option value="5">5 viajeros</option>
+            <option value="6">6 viajeros</option>
+          </select>
+        </label>
+        <button class="primary search-submit" type="submit">Buscar</button>
+      </form>
+      <p id="serviceHint" class="demo-note">Precios, rutas y servicios de ejemplo. No se procesan pagos ni se confirman reservas reales.</p>
+    </section>
+
+    <section class="content" id="catalogo">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">IDEAS PARA TU VIAJE</p>
+          <h2 id="catalogTitle">Opciones de hospedaje</h2>
+        </div>
+        <label>Precio máximo
+          <select id="maxPrice">
+            <option value="100000000">Cualquier precio</option>
+            <option value="150000">Hasta $150.000</option>
+            <option value="300000">Hasta $300.000</option>
+            <option value="700000">Hasta $700.000</option>
+            <option value="1500000">Hasta $1.500.000</option>
+            <option value="3000000">Hasta $3.000.000</option>
+            <option value="5000000">Hasta $5.000.000</option>
+            <option value="10000000">Hasta $10.000.000</option>
+          </select>
+        </label>
+      </div>
+
+      <section id="flightMapSection" class="flight-map-section" hidden aria-labelledby="flightMapTitle">
+        <div class="flight-map-heading">
+          <div>
+            <p class="eyebrow">RUTAS DE EJEMPLO</p>
+            <h2 id="flightMapTitle">Vuela desde Colombia al mundo</h2>
+          </div>
+          <p>Mapa esquemático. Las rutas no representan horarios ni disponibilidad en vivo.</p>
+        </div>
+        <div class="flight-map" role="img" aria-label="Mapa esquemático con rutas ilustrativas desde Colombia a destinos internacionales">
+          <svg id="routeMap" viewBox="0 0 960 420" aria-hidden="true">
+            <path class="map-land" d="M92 93 131 68 191 72 225 91 257 104 278 139 269 164 287 188 273 211 260 240 247 278 230 308 218 350 193 365 184 332 166 306 162 275 142 246 135 216 110 190 96 162 76 139 81 113Z"/>
+            <path class="map-land" d="M233 206 260 209 278 235 276 264 291 290 280 319 270 354 252 378 238 358 232 326 218 299 222 270 211 243Z"/>
+            <path class="map-land" d="M405 103 431 88 465 90 486 105 477 123 450 130 431 121 411 126Z"/>
+            <path class="map-land" d="M456 139 488 126 527 128 550 146 566 167 551 187 534 201 524 234 500 259 481 243 475 212 454 189 443 165Z"/>
+            <path class="map-land" d="M499 95 550 70 618 69 669 83 715 77 775 94 819 115 837 141 817 157 784 154 760 174 726 169 698 187 670 178 645 193 619 180 596 165 570 162 549 142 523 132Z"/>
+            <path class="map-land" d="M750 271 784 252 825 260 852 281 838 308 805 320 773 308 753 291Z"/>
+            <path class="map-land" d="M838 190 850 184 858 196 852 211 841 207Z"/>
+            <path class="map-grid-line" d="M40 210H920M480 35V385"/>
+            <g id="routeLines"></g>
+            <g id="routeMarkers"></g>
+          </svg>
+        </div>
+        <div id="routeChips" class="route-chips" aria-label="Rutas internacionales de ejemplo"></div>
+        <p class="map-caption">Conecta desde Bogotá con destinos ilustrativos. Confirma rutas, escalas y fechas con la aerolínea antes de comprar.</p>
+      </section>
+
+      <div class="catalog-layout">
+        <div class="catalog-results">
+          <p id="status" role="status">Preparando opciones de viaje...</p>
+          <div id="hotelList" class="hotel-grid"></div>
+        </div>
+
+        <aside class="cart-panel" id="reservaciones" aria-label="Carrito de reservaciones">
+          <div class="cart-header">
+            <div>
+              <p class="eyebrow">TU VIAJE</p>
+              <h2>Reservaciones</h2>
+            </div>
+            <span id="cartCount" class="cart-badge" aria-label="Artículos en el carrito">0</span>
+          </div>
+          <ul id="cartItems" class="cart-items">
+            <li>Tu carrito está vacío. Agrega un hotel, auto o vuelo.</li>
+          </ul>
+          <div class="cart-total">
+            <span>Total estimado</span>
+            <strong id="cartTotal">$0</strong>
+          </div>
+          <button id="reserveButton" class="primary" type="button">Revisar reservaciones</button>
+          <p id="reservationStatus" role="status" aria-live="polite"></p>
+          <p class="cart-disclaimer">El total es una estimación ficticia en COP. No incluye cobros ni confirma servicios.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="contact">
+      <h2>¿Necesitas ayuda?</h2>
+      <p>Escríbenos para consultar sobre las opciones de demostración.</p>
+      <a id="whatsappLink" class="primary"
+         href="https://wa.me/573001234567"
+         target="_blank" rel="noopener noreferrer">
+        Contactar por WhatsApp
+      </a>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand" href="./index.html">Hotelia<span>.</span></a>
+    <p>Catálogo de demostración: alojamientos, autos y vuelos con datos ficticios.</p>
+    <p>No se procesan pagos ni se confirman reservas reales.</p>
+  </footer>
+</body>
+</html>

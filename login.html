@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso | Hotelia</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Hotelia<span>.</span></a>
+    <a href="/">Volver al inicio</a>
+  </header>
+
+  <main class="content">
+    <section style="max-width:460px;margin:auto;background:white;padding:25px;border-radius:14px">
+      <h1>Tu cuenta Hotelia</h1>
+      <p>Regístrate, inicia sesión o recupera tu contraseña con tu correo.</p>
+      <p class="auth-note">La confirmación y recuperación se envían mediante Supabase Auth. Para usar correos reales, configura el proveedor de correo/SMTP en tu proyecto.</p>
+
+      <form id="authForm">
+        <label>Nombre de usuario (para crear cuenta)
+          <input id="username" maxlength="40"
+            autocomplete="username">
+        </label>
+
+        <br>
+
+        <label>Correo electrónico
+          <input id="email" type="email" autocomplete="email" required>
+        </label>
+
+        <br>
+
+        <label>Contraseña
+          <input id="password" type="password"
+            minlength="8" autocomplete="current-password" required>
+        </label>
+
+        <br>
+
+        <button class="primary" type="submit" style="width:100%">
+          Iniciar sesión
+        </button>
+      </form>
+
+      <button id="register" type="button" class="primary"
+        style="width:100%;margin-top:12px">
+        Crear cuenta
+      </button>
+
+      <button id="resetPassword" type="button" class="text-button">
+        Olvidé mi contraseña
+      </button>
+
+      <p id="message" role="status"></p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { createClient } from
+      "https://esm.sh/@supabase/supabase-js@2";
+
+    const message = document.querySelector("#message");
+    const form = document.querySelector("#authForm");
+    const registerButton = document.querySelector("#register");
+    const resetButton = document.querySelector("#resetPassword");
+
+    let supabase;
+
+    async function initialize() {
+      const response = await fetch("/api/config");
+      if (!response.ok) throw new Error("No se pudo cargar la configuración.");
+
+      const config = await response.json();
+      if (config.supabaseAuthConfigured === false ||
+          !config.supabaseUrl || !config.supabasePublishableKey) {
+        throw new Error("El acceso por correo necesita SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY (o SUPABASE_ANON_KEY) válidos en .env.");
+      }
+
+      supabase = createClient(
+        config.supabaseUrl,
+        config.supabasePublishableKey
+      );
+    }
+
+    async function register() {
+      if (!supabase) {
+        message.textContent = "El servicio de correo todavía no está configurado.";
+        return;
+      }
+
+      if (!form.reportValidity()) return;
+
+      const username = document.querySelector("#username").value.trim();
+      const email = document.querySelector("#email").value.trim();
+      const password = document.querySelector("#password").value;
+
+      if (username.length < 3) {
+        message.textContent = "El nombre debe tener al menos 3 caracteres.";
+        return;
+      }
+
+      try {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { username },
+            emailRedirectTo: `${location.origin}/login.html`
+          }
+        });
+
+        message.textContent = error
+          ? error.message
+          : "Registro enviado. Revisa tu correo y confirma la cuenta para poder iniciar sesión.";
+      } catch (error) {
+        message.textContent = error.message || "No se pudo completar el registro. Inténtalo de nuevo.";
+      }
+    }
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!supabase) {
+        message.textContent = "El servicio de correo todavía no está configurado.";
+        return;
+      }
+
+      const email = document.querySelector("#email").value.trim();
+      const password = document.querySelector("#password").value;
+
+      try {
+        if (location.hash.includes("type=recovery")) {
+          const { error } = await supabase.auth.updateUser({ password });
+          if (error) {
+            message.textContent = error.message;
+            return;
+          }
+
+          message.textContent = "Contraseña actualizada. Ya puedes iniciar sesión.";
+          history.replaceState(null, "", "/login.html");
+          return;
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (error) {
+          message.textContent = error.message;
+          return;
+        }
+
+        message.textContent = "Inicio de sesión correcto.";
+        const accessToken = data.session?.access_token;
+        if (!accessToken) {
+          message.textContent = "Iniciaste sesión, pero no se pudo validar tu sesión.";
+          return;
+        }
+
+        const adminResponse = await fetch("/api/admin/me", {
+          headers: {
+            Authorization: "Bearer " + accessToken
+          }
+        });
+
+        if (adminResponse.ok) {
+          location.href = "/admin.html";
+        } else if (adminResponse.status === 403) {
+          location.href = "/";
+        } else {
+          const result = await adminResponse.json().catch(() => ({}));
+          message.textContent = result.error ||
+            "Iniciaste sesión, pero no se pudo comprobar el acceso al panel.";
+        }
+      } catch (error) {
+        message.textContent = error.message || "No se pudo iniciar sesión. Inténtalo de nuevo.";
+      }
+    });
+
+    registerButton.addEventListener("click", register);
+
+    resetButton.addEventListener("click", async () => {
+      if (!supabase) {
+        message.textContent = "El servicio de correo todavía no está configurado.";
+        return;
+      }
+
+      const email = document.querySelector("#email").value.trim();
+      if (!email) {
+        message.textContent = "Escribe tu correo para enviarte el enlace de recuperación.";
+        document.querySelector("#email").focus();
+        return;
+      }
+
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${location.origin}/login.html`
+        });
+
+        message.textContent = error
+          ? error.message
+          : "Si el correo está registrado, recibirás un enlace para restablecer la contraseña.";
+      } catch (error) {
+        message.textContent = error.message || "No se pudo enviar el enlace. Inténtalo de nuevo.";
+      }
+    });
+
+    initialize().catch(error => {
+      message.textContent = error.message;
+    });
+  </script>
+</body>
+</html>
