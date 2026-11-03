@@ -2,6 +2,8 @@ const list = document.querySelector("#hotelList");
 const statusText = document.querySelector("#status");
 const searchForm = document.querySelector("#searchForm");
 const maxPrice = document.querySelector("#maxPrice");
+const flightTripField = document.querySelector("#flightTripField");
+const flightTripType = document.querySelector("#flightTripType");
 const cartItems = document.querySelector("#cartItems");
 const cartCount = document.querySelector("#cartCount");
 const navCartCount = document.querySelector("#navCartCount");
@@ -35,7 +37,10 @@ const demoHotels = [
     description: "Hotel boutique de inspiración colonial con patio tropical, piscina y desayuno preparado con productos locales.",
     price: 285000,
     rating: 4.8,
-    image_url: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80"
+    image_url: "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/Cartagena%2C_Colombia_2010.jpg/1280px-Cartagena%2C_Colombia_2010.jpg",
+    image_alt: "Fotografía de Cartagena, Colombia, tomada en 2010.",
+    image_credit: "Foto: Ericka Clouther / Wikimedia Commons (CC BY 2.0)",
+    image_credit_url: "https://commons.wikimedia.org/wiki/File:Cartagena,_Colombia_2010.jpg"
   },
   {
     id: "demo-medellin",
@@ -55,7 +60,10 @@ const demoHotels = [
     description: "Casa de campo entre cafetales, con terraza panorámica y espacios tranquilos para explorar el valle.",
     price: 175000,
     rating: 4.9,
-    image_url: "https://tse3.mm.bing.net/th/id/OIP.-PiV5szpI23-5yClTQd6NwHaE8?r=0&pid=Api&h=220&P=0"
+    image_url: "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2b/Salento%2C_Quindio%2C_Colombia_-_panoramio_-_Jimmy_G%C3%B3mez_N_%2816%29.jpg/1280px-Salento%2C_Quindio%2C_Colombia_-_panoramio_-_Jimmy_G%C3%B3mez_N_%2816%29.jpg",
+    image_alt: "Fotografía de Salento, Quindío, Colombia.",
+    image_credit: "Foto: Jimmy Gómez N / Wikimedia Commons (CC BY-SA 3.0)",
+    image_credit_url: "https://commons.wikimedia.org/wiki/File:Salento,_Quindio,_Colombia_-_panoramio_-_Jimmy_G%C3%B3mez_N_(16).jpg"
   },
   {
     id: "demo-tokyo",
@@ -314,8 +322,10 @@ function readCart() {
       airport: typeof item.airport === "string" ? item.airport : "",
       pickupTime: typeof item.pickupTime === "string" ? item.pickupTime : "",
       arrivalTime: typeof item.arrivalTime === "string" ? item.arrivalTime : "",
-      originalPrice: Number(item.originalPrice) || Number(item.price),
-      discount: Number(item.discount) || 0
+      tripType: item.type === "flight" &&
+        ["ida", "ida-vuelta"].includes(item.tripType)
+        ? item.tripType
+        : item.type === "flight" ? "ida-vuelta" : ""
     }));
   } catch {
     return [];
@@ -355,8 +365,13 @@ function getDays(startDate, endDate) {
 function bookingDetails() {
   const dateStart = document.querySelector("#dateStart").value;
   const dateEnd = document.querySelector("#dateEnd").value;
-  const dateEndRequired = activeType !== "taxi";
-  const days = dateEndRequired ? getDays(dateStart, dateEnd) : Boolean(dateStart);
+  const dateEndRequired = activeType !== "taxi" &&
+    !(activeType === "flight" && flightTripType.value === "ida");
+  const sameDayCarRental = activeType === "car" &&
+    Boolean(dateStart) && dateStart === dateEnd;
+  const days = dateEndRequired
+    ? sameDayCarRental ? 1 : getDays(dateStart, dateEnd)
+    : Boolean(dateStart);
   const pickupTime = document.querySelector("#pickupTime").value;
   const arrivalTime = document.querySelector("#arrivalTime").value;
   const tripDestination = document.querySelector("#destination").value.trim();
@@ -364,7 +379,9 @@ function bookingDetails() {
   if (!days) {
     reservationStatus.textContent = dateEndRequired
       ? "Selecciona fechas válidas: el regreso debe ser posterior a la salida."
-      : "Selecciona la fecha de recogida del taxi.";
+      : activeType === "flight"
+        ? "Selecciona la fecha del vuelo."
+        : "Selecciona la fecha de recogida del taxi.";
     return null;
   }
 
@@ -400,7 +417,9 @@ function bookingDetails() {
 function itemTotal(item) {
   if (item.type === "flight") return item.price * item.guests * item.quantity;
   if (item.type === "taxi") return item.price * item.quantity;
-  return item.price * getDays(item.dateStart, item.dateEnd) * item.quantity;
+  const days = getDays(item.dateStart, item.dateEnd) ||
+    (item.type === "car" && item.dateStart && item.dateStart === item.dateEnd ? 1 : 0);
+  return item.price * days * item.quantity;
 }
 
 function saveCart() {
@@ -414,6 +433,7 @@ function addToCart(item) {
 
   const existing = cart.find(entry =>
     String(entry.id) === String(item.id) &&
+    (entry.tripType || "ida-vuelta") === (item.tripType || "ida-vuelta") &&
     entry.dateStart === booking.dateStart &&
     entry.dateEnd === booking.dateEnd &&
     entry.guests === booking.guests &&
@@ -429,12 +449,11 @@ function addToCart(item) {
     cart.push({
       id: item.id,
       type: item.type,
+      tripType: item.tripType || "",
       name: safeText(item.name),
       city: safeText(item.city),
       airport: booking.airport || safeText(item.airport),
       price: Number(item.price),
-      originalPrice: Number(item.originalPrice) || Number(item.price),
-      discount: Number(item.discount) || 0,
       quantity: 1,
       dateStart: booking.dateStart,
       dateEnd: booking.dateEnd,
@@ -477,7 +496,11 @@ function renderCart() {
       : item.type === "car"
         ? `${item.city} · ${item.dateStart} a ${item.dateEnd} · recogida ${item.pickupTime} · devolución ${item.arrivalTime}`
         : item.type === "flight"
-          ? `${item.city} · ${item.dateStart} a ${item.dateEnd} · ${item.guests} viajero(s)`
+          ? `${item.city} · ${item.tripType === "ida-vuelta"
+            ? `${item.dateStart} a ${item.dateEnd}`
+            : `Ida: ${item.dateStart}`} · ${
+              item.tripType === "ida-vuelta" ? "Ida y vuelta" : "Ida"
+            } · ${item.guests} viajero(s)`
           : `${item.city} · ${item.dateStart} a ${item.dateEnd} · ${item.guests} huésped(es)`;
     summary.textContent = `${labels[item.type]}: ${item.name} · ${details} · ${item.quantity} unidad(es)`;
 
@@ -521,6 +544,7 @@ function updateCatalogHeading() {
 
 function setActiveService(type) {
   activeType = type;
+  updateDateEndMinimum();
   document.querySelectorAll(".service-tab").forEach(button => {
     const active = button.dataset.service === type;
     button.classList.toggle("is-active", active);
@@ -530,23 +554,24 @@ function setActiveService(type) {
   const dateStartLabelText = {
     hotel: "Entrada",
     car: "Fecha de recogida",
-    flight: "Fecha de salida",
+    flight: "Fecha de ida",
     taxi: "Fecha de recogida"
   }[type];
   const dateEndLabelText = {
     hotel: "Salida",
     car: "Fecha de devolución",
-    flight: "Fecha de regreso",
+    flight: "Fecha de vuelta",
     taxi: "Fecha de llegada"
   }[type];
   startDateLabel.childNodes[0].textContent = `${dateStartLabelText} `;
   endDateLabel.childNodes[0].textContent = `${dateEndLabelText} `;
-  endDateLabel.hidden = type === "taxi";
-  document.querySelector("#dateEnd").required = type !== "taxi";
+  const needsReturnDate = type !== "taxi" &&
+    !(type === "flight" && flightTripType.value === "ida");
+  endDateLabel.hidden = !needsReturnDate;
+  document.querySelector("#dateEnd").required = needsReturnDate;
 
   routeLabel.childNodes[0].textContent =
-    type === "taxi" ? "Destino del taxi " :
-    type === "flight" ? "Origen o destino " : "Destino ";
+    type === "taxi" ? "Destino del taxi " : "Destino ";
   document.querySelector("#destination").placeholder =
     type === "taxi" ? "Ej. Centro, Bogotá" :
     type === "flight" ? "Ej. Madrid, España" : "Ej. Tokio, Japón";
@@ -563,22 +588,25 @@ function setActiveService(type) {
     type === "car" ? "Hora de devolución " : "Hora de llegada estimada ";
 
   flightMapSection.hidden = type !== "flight";
-  if (type === "taxi") {
-    document.querySelector("#serviceHint").textContent =
-      "Horarios de solicitud en formato 24 h. La disponibilidad, tarifa y operador deben confirmarse directamente con el aeropuerto o proveedor; esta web no garantiza el servicio.";
-  } else if (type === "flight") {
-    document.querySelector("#serviceHint").textContent =
-      "Rutas y descuentos ficticios, solo ilustrativos. No son ofertas vigentes ni disponibilidad en vivo; confirma con la aerolínea.";
-  } else if (type === "car") {
-    document.querySelector("#serviceHint").textContent =
-      "Indica fecha y hora de recogida y devolución. Tarifas e imágenes de ejemplo, no disponibles para reservar realmente.";
-  } else {
-    document.querySelector("#serviceHint").textContent =
-      "Precios, rutas y servicios de ejemplo. No se procesan pagos ni se confirman reservas reales.";
-  }
+  flightTripField.hidden = type !== "flight";
 
   updateCatalogHeading();
   renderItems();
+}
+
+function flightOption(item) {
+  const isOneWay = flightTripType.value === "ida";
+  return {
+    ...item,
+    tripType: flightTripType.value,
+    description: `Tarifa ficticia de demostración por viajero para vuelo ${
+      isOneWay ? "solo de ida" : "de ida y vuelta"
+    }. No disponible para compra real.`,
+    price: isOneWay ? Math.ceil(Number(item.price) / 2) : Number(item.price),
+    originalPrice: isOneWay
+      ? Math.ceil(Number(item.originalPrice) / 2)
+      : Number(item.originalPrice)
+  };
 }
 
 function renderFlightMap() {
@@ -645,7 +673,9 @@ function renderFlightMap() {
 function renderItems() {
   const priceLimit = Number(maxPrice.value);
   const normalizedDestination = normalizeSearch(destination);
-  const results = items.filter(item => {
+  const results = items.map(item =>
+    item.type === "flight" ? flightOption(item) : item
+  ).filter(item => {
     const matchesType = item.type === activeType;
     const matchesPrice = Number(item.price) <= priceLimit;
     const searchable = normalizeSearch(`${item.name} ${item.city} ${item.description}`);
@@ -674,14 +704,27 @@ function renderItems() {
     const card = document.createElement("article");
     card.className = "hotel-card";
 
-    const image = document.createElement("img");
-    image.src = item.image_url || "";
-    image.alt = `Imagen de ${safeText(item.name)}`;
-    image.loading = "lazy";
-    image.addEventListener("error", () => {
-      image.removeAttribute("src");
-      image.alt = "Imagen no disponible";
-    }, { once: true });
+    let image = null;
+    if (item.image_url) {
+      image = document.createElement("img");
+      image.src = item.image_url;
+      image.alt = item.image_alt || `Imagen de ${safeText(item.name)}`;
+      image.loading = "lazy";
+      image.addEventListener("error", () => {
+        image.removeAttribute("src");
+        image.alt = "Imagen no disponible";
+      }, { once: true });
+    }
+
+    let imageCredit = null;
+    if (item.image_credit && item.image_credit_url) {
+      imageCredit = document.createElement("a");
+      imageCredit.className = "photo-credit";
+      imageCredit.textContent = item.image_credit;
+      imageCredit.href = item.image_credit_url;
+      imageCredit.target = "_blank";
+      imageCredit.rel = "noopener noreferrer";
+    }
 
     const info = document.createElement("div");
     info.className = "hotel-info";
@@ -710,7 +753,7 @@ function renderItems() {
     const unit = {
       hotel: "por noche",
       car: "por día",
-      flight: "por viajero · ida y vuelta",
+      flight: `por viajero · ${item.tripType === "ida-vuelta" ? "ida y vuelta" : "solo ida"}`,
       taxi: "por trayecto (estimado)"
     }[item.type];
     if (item.type === "flight") {
@@ -730,9 +773,6 @@ function renderItems() {
     const actions = document.createElement("div");
     actions.className = "hotel-actions";
 
-    const rating = document.createElement("span");
-    rating.textContent = `⭐ ${Number(item.rating).toFixed(1)}`;
-
     const reserve = document.createElement("button");
     reserve.type = "button";
     reserve.className = "primary";
@@ -748,9 +788,16 @@ function renderItems() {
     locationLink.target = "_blank";
     locationLink.rel = "noopener noreferrer";
 
-    actions.append(rating, reserve, locationLink);
+    if (Number(item.rating) > 0) {
+      const rating = document.createElement("span");
+      rating.textContent = `⭐ ${Number(item.rating).toFixed(1)}`;
+      actions.append(rating);
+    }
+    actions.append(reserve, locationLink);
     info.append(badge, title, city, description, price, actions);
-    card.append(image, info);
+    if (image) card.append(image);
+    if (imageCredit) card.append(imageCredit);
+    card.append(info);
     list.append(card);
   });
 }
@@ -777,7 +824,6 @@ async function loadItems() {
 
   renderItems();
 }
-
 searchForm.addEventListener("submit", event => {
   event.preventDefault();
   if (!bookingDetails()) return;
@@ -790,6 +836,20 @@ searchForm.addEventListener("submit", event => {
 });
 
 maxPrice.addEventListener("change", renderItems);
+flightTripType.addEventListener("change", () => {
+  if (activeType === "flight") {
+    setActiveService("flight");
+  }
+});
+document.querySelector("#exploreFlightsLink").addEventListener("click", event => {
+  event.preventDefault();
+  destination = "";
+  document.querySelector("#destination").value = "";
+  reservationStatus.textContent = "";
+  setActiveService("flight");
+  flightMapSection.scrollIntoView({ behavior: "smooth" });
+});
+
 document.querySelectorAll(".service-tab").forEach(button => {
   button.addEventListener("click", () => {
     destination = "";
@@ -811,7 +871,16 @@ reserveButton.addEventListener("click", () => {
 
   if (cart.some(item => item.type === "taxi"
     ? !item.dateStart || !item.pickupTime || !item.arrivalTime || !item.destination
-    : !getDays(item.dateStart, item.dateEnd))) {
+    : item.type === "flight"
+      ? item.tripType === "ida"
+        ? !item.dateStart
+        : !getDays(item.dateStart, item.dateEnd)
+      : item.type === "car"
+        ? !getDays(item.dateStart, item.dateEnd) &&
+          !(item.dateStart && item.dateStart === item.dateEnd &&
+            item.pickupTime && item.arrivalTime &&
+            item.arrivalTime > item.pickupTime)
+        : !getDays(item.dateStart, item.dateEnd))) {
     reservationStatus.textContent = "Hay una reservación con fechas, horario o destino incompletos. Quítala y agrégala de nuevo.";
     return;
   }
@@ -831,18 +900,26 @@ const formatDate = date => {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
+function updateDateEndMinimum() {
+  const dateStart = document.querySelector("#dateStart").value;
+  if (!dateStart) return;
+
+  const minimumDate = new Date(`${dateStart}T00:00:00`);
+  if (activeType !== "car") minimumDate.setDate(minimumDate.getDate() + 1);
+  const minimumValue = formatDate(minimumDate);
+  const dateEnd = document.querySelector("#dateEnd");
+  dateEnd.min = minimumValue;
+  if (dateEnd.value && dateEnd.value < minimumValue) {
+    dateEnd.value = minimumValue;
+  }
+}
 document.querySelector("#dateStart").value = formatDate(tomorrow);
 document.querySelector("#dateEnd").value = formatDate(dayAfter);
 document.querySelector("#dateStart").min = formatDate(today);
 document.querySelector("#dateEnd").min = formatDate(tomorrow);
 
-document.querySelector("#dateStart").addEventListener("change", event => {
-  const nextDate = new Date(`${event.target.value}T00:00:00`);
-  nextDate.setDate(nextDate.getDate() + 1);
-  document.querySelector("#dateEnd").min = formatDate(nextDate);
-  if (document.querySelector("#dateEnd").value <= event.target.value) {
-    document.querySelector("#dateEnd").value = formatDate(nextDate);
-  }
+document.querySelector("#dateStart").addEventListener("change", () => {
+  updateDateEndMinimum();
 });
 
 document.querySelector("#pickupTime").value = "09:00";
