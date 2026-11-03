@@ -4,116 +4,366 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Acceso | Hotelia</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="./styles.css?v=4">
 </head>
-<body>
+<body class="auth-page">
   <header class="topbar">
     <a class="brand" href="/">Hotelia<span>.</span></a>
     <a href="/">Volver al inicio</a>
   </header>
 
-  <main class="content">
-    <section style="max-width:460px;margin:auto;background:white;padding:25px;border-radius:14px">
-      <h1>Tu cuenta Hotelia</h1>
-      <p>Regístrate, inicia sesión o recupera tu contraseña con tu correo.</p>
-      <p class="auth-note">La confirmación y recuperación se envían mediante Supabase Auth. Para usar correos reales, configura el proveedor de correo/SMTP en tu proyecto.</p>
+  <main class="content auth-main">
+    <section class="auth-card">
+      <div class="auth-mark" aria-hidden="true">H</div>
+      <p id="authEyebrow" class="eyebrow auth-eyebrow">TU PRÓXIMO VIAJE COMIENZA AQUÍ</p>
+      <h1 id="authTitle">¡Qué bueno verte!</h1>
+      <p id="authIntro" class="auth-intro">Inicia sesión para continuar planeando momentos inolvidables.</p>
+      <p id="authNote" class="auth-note">Cargando opciones de acceso...</p>
 
-      <form id="authForm">
-        <label>Nombre de usuario (para crear cuenta)
-          <input id="username" maxlength="40"
-            autocomplete="username">
+      <form id="authForm" class="auth-form">
+        <label id="firstNameField" hidden>Nombre
+          <input id="firstName" maxlength="80" autocomplete="given-name">
         </label>
 
-        <br>
+        <label id="lastNameField" hidden>Apellido (opcional)
+          <input id="lastName" maxlength="80" autocomplete="family-name">
+        </label>
 
         <label>Correo electrónico
           <input id="email" type="email" autocomplete="email" required>
         </label>
 
-        <br>
-
-        <label>Contraseña
-          <input id="password" type="password"
-            minlength="8" autocomplete="current-password" required>
+        <label id="cedulaField" hidden>Número de cédula
+          <input id="cedula" type="text" inputmode="numeric" autocomplete="off" maxlength="20">
         </label>
 
-        <br>
+        <label id="passwordField">Contraseña
+          <input id="password" type="password"
+            minlength="6" autocomplete="current-password" required>
+        </label>
 
-        <button class="primary" type="submit" style="width:100%">
-          Iniciar sesión
+        <button class="primary auth-submit" type="submit">
+          <span id="submitLabel">Iniciar sesión</span>
         </button>
       </form>
 
-      <button id="register" type="button" class="primary"
-        style="width:100%;margin-top:12px">
+      <button id="register" type="button" class="primary auth-register">
         Crear cuenta
+      </button>
+
+      <button id="backToLogin" type="button" class="text-button" hidden>
+        ¿Ya tienes una cuenta? Inicia sesión
+      </button>
+
+      <button id="emailSignIn" type="button" class="text-button">
+        Recibir enlace de acceso por correo
       </button>
 
       <button id="resetPassword" type="button" class="text-button">
         Olvidé mi contraseña
       </button>
 
+      <section id="profileSetup" class="profile-setup" hidden aria-labelledby="profileTitle">
+        <h2 id="profileTitle">Información de la cuenta</h2>
+        <p>Consulta la información de tu cuenta y administra tu foto de perfil.</p>
+        <div class="account-information" aria-label="Información de la cuenta">
+          <p><strong>Nombre completo</strong><span id="accountName"></span></p>
+          <p><strong>Correo electrónico</strong><span id="accountEmail"></span></p>
+        </div>
+        <h3>Foto de perfil</h3>
+        <div class="avatar-preview-wrap">
+          <img id="avatarPreview" alt="Vista previa de la foto de perfil" hidden>
+          <span id="avatarPlaceholder" aria-hidden="true">H</span>
+        </div>
+        <input id="avatarFile" type="file" accept="image/*" hidden>
+        <button id="chooseAvatar" class="primary" type="button">Modificar foto de perfil</button>
+        <p id="avatarStatus" role="status" aria-live="polite"></p>
+        <button id="saveAvatar" class="primary" type="button" disabled>Guardar foto de perfil</button>
+        <button id="logout" class="text-button logout-button" type="button">Cerrar sesión</button>
+      </section>
+
       <p id="message" role="status"></p>
     </section>
   </main>
 
   <script type="module">
-    import { createClient } from
-      "https://esm.sh/@supabase/supabase-js@2";
-
     const message = document.querySelector("#message");
     const form = document.querySelector("#authForm");
     const registerButton = document.querySelector("#register");
+    const backToLoginButton = document.querySelector("#backToLogin");
+    const emailSignInButton = document.querySelector("#emailSignIn");
     const resetButton = document.querySelector("#resetPassword");
+    const firstNameField = document.querySelector("#firstNameField");
+    const lastNameField = document.querySelector("#lastNameField");
+    const cedulaField = document.querySelector("#cedulaField");
+    const passwordField = document.querySelector("#passwordField");
+    const passwordInput = document.querySelector("#password");
+    const authNote = document.querySelector("#authNote");
+    const profileSetup = document.querySelector("#profileSetup");
+    const avatarFile = document.querySelector("#avatarFile");
+    const avatarPreview = document.querySelector("#avatarPreview");
+    const avatarPlaceholder = document.querySelector("#avatarPlaceholder");
+    const avatarStatus = document.querySelector("#avatarStatus");
+    const saveAvatarButton = document.querySelector("#saveAvatar");
+    const accountName = document.querySelector("#accountName");
+    const accountEmail = document.querySelector("#accountEmail");
+    const logoutButton = document.querySelector("#logout");
+    const submitLabel = document.querySelector("#submitLabel");
+    const authTitle = document.querySelector("#authTitle");
+    const authIntro = document.querySelector("#authIntro");
+    const authEyebrow = document.querySelector("#authEyebrow");
 
     let supabase;
+    let localMode = false;
+    let authSetupError =
+      "La configuración de Supabase aún no termina de cargarse. Inténtalo de nuevo.";
+    let isRegistering = false;
+    let selectedAvatar;
+    let signedInToken = "";
+    let previewUrl = "";
 
-    async function initialize() {
-      const response = await fetch("/api/config");
-      if (!response.ok) throw new Error("No se pudo cargar la configuración.");
+    function requireSupabase() {
+      if (supabase) return true;
+      message.textContent = authSetupError;
+      return false;
+    }
 
-      const config = await response.json();
-      if (config.supabaseAuthConfigured === false ||
-          !config.supabaseUrl || !config.supabasePublishableKey) {
-        throw new Error("El acceso por correo necesita SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY (o SUPABASE_ANON_KEY) válidos en .env.");
+    function setRegistrationMode(enabled) {
+      isRegistering = enabled;
+      firstNameField.hidden = !enabled;
+      lastNameField.hidden = !enabled;
+      cedulaField.hidden = !enabled;
+      passwordField.hidden = false;
+      document.querySelector("#firstName").required = enabled;
+      document.querySelector("#cedula").required = enabled;
+      passwordInput.required = true;
+      passwordInput.autocomplete = enabled ? "new-password" : "current-password";
+      submitLabel.textContent = enabled ? "Crear cuenta" : "Iniciar sesión";
+      authTitle.textContent = enabled ? "Crea tu cuenta" : "¡Qué bueno verte!";
+      authIntro.textContent = enabled
+        ? "Completa tus datos para crear tu cuenta."
+        : "Inicia sesión para continuar planeando momentos inolvidables.";
+      authEyebrow.textContent = enabled
+        ? "BIENVENIDO A HOTELIA"
+        : "TU PRÓXIMO VIAJE COMIENZA AQUÍ";
+      registerButton.hidden = enabled;
+      backToLoginButton.hidden = !enabled;
+      emailSignInButton.hidden = enabled;
+      resetButton.hidden = enabled;
+      message.textContent = "";
+    }
+
+    function showProfileEditor(user, accessToken) {
+      signedInToken = accessToken;
+      form.hidden = true;
+      registerButton.hidden = true;
+      backToLoginButton.hidden = true;
+      emailSignInButton.hidden = true;
+      resetButton.hidden = true;
+      profileSetup.hidden = false;
+      authTitle.textContent = "Mi cuenta";
+      authIntro.textContent = "Administra tu información y tu foto de perfil.";
+      authEyebrow.textContent = "PERFIL DE HOTELIA";
+      message.textContent = "";
+
+      const metadata = user.user_metadata || {};
+      const nameParts = [
+        metadata.first_name || metadata.given_name,
+        metadata.last_name
+      ].filter(value => typeof value === "string" && value.trim());
+      const fullName = nameParts.join(" ") || metadata.full_name || metadata.name;
+      accountName.textContent = typeof fullName === "string" && fullName.trim()
+        ? fullName.trim()
+        : "No especificado";
+      accountEmail.textContent = typeof user.email === "string" && user.email.trim()
+        ? user.email.trim()
+        : "No especificado";
+
+      const avatarUrl = metadata.avatar_url;
+      if (avatarUrl) {
+        avatarPreview.src = avatarUrl;
+        avatarPreview.hidden = false;
+        avatarPlaceholder.hidden = true;
+      }
+    }
+
+    async function prepareAvatar(file) {
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Selecciona un archivo de imagen.");
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error("La imagen debe pesar menos de 10 MB.");
       }
 
+      const image = await createImageBitmap(file);
+      const side = Math.min(image.width, image.height);
+      const left = Math.floor((image.width - side) / 2);
+      const top = Math.floor((image.height - side) / 2);
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+      canvas.getContext("2d").drawImage(
+        image, left, top, side, side, 0, 0, canvas.width, canvas.height
+      );
+      image.close();
+
+      const blob = await new Promise(resolve =>
+        canvas.toBlob(resolve, "image/jpeg", 0.85)
+      );
+      if (!blob) throw new Error("No se pudo preparar la imagen seleccionada.");
+      return blob;
+    }
+
+    async function saveAvatar() {
+      if (!selectedAvatar || !signedInToken) return;
+
+      saveAvatarButton.disabled = true;
+      avatarStatus.textContent = "Guardando tu foto de perfil...";
+      try {
+        const response = await fetch(
+          localMode ? "/api/local-auth/avatar" : "/api/profile/avatar",
+          {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + signedInToken,
+            "Content-Type": "image/jpeg"
+          },
+          body: selectedAvatar
+          }
+        );
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || "No se pudo guardar la foto de perfil.");
+        }
+
+        avatarPreview.src = result.avatarUrl;
+        avatarPreview.hidden = false;
+        avatarPlaceholder.hidden = true;
+        avatarStatus.textContent = "Foto de perfil guardada.";
+        selectedAvatar = null;
+        avatarFile.value = "";
+      } catch (error) {
+        avatarStatus.textContent = error.message ||
+          "No se pudo guardar la foto de perfil. Inténtalo de nuevo.";
+      } finally {
+        saveAvatarButton.disabled = !selectedAvatar;
+      }
+    }
+
+    async function initialize() {
+      let response;
+      try {
+        response = await fetch("/api/config");
+      } catch {
+        throw new Error("No se pudo conectar con el servidor de Hotelia. Inicia la aplicación con «npm run start» y abre la página desde el servidor, no con Live Server ni como archivo local.");
+      }
+
+      if (!response.ok) {
+        throw new Error(`El servidor de Hotelia respondió con error HTTP ${response.status} al cargar la configuración. Inicia la aplicación con «npm run start» y abre la página desde el servidor.`);
+      }
+
+      const config = await response.json();
+      if (config.authProvider === "local") {
+        localMode = true;
+        authNote.textContent = "Modo local de esta instalación: las cuentas se guardan en este servidor. Usa un correo válido y una contraseña de al menos 6 caracteres.";
+        emailSignInButton.hidden = true;
+        resetButton.hidden = true;
+        const token = localStorage.getItem("hotelia-local-session");
+        if (!token) return;
+
+        const sessionResponse = await fetch("/api/local-auth/me", {
+          headers: { Authorization: "Bearer " + token }
+        });
+        if (!sessionResponse.ok) {
+          localStorage.removeItem("hotelia-local-session");
+          return;
+        }
+
+        const { user } = await sessionResponse.json();
+        showProfileEditor(user, token);
+        return;
+      }
+
+      if (!config.supabaseUrl || !config.supabasePublishableKey) {
+        throw new Error("La configuración de inicio de sesión no está completa.");
+      }
+
+      authNote.textContent = "Los enlaces de acceso y recuperación se envían mediante Supabase Auth. Para usar correos reales, configura el proveedor de correo/SMTP en tu proyecto.";
+      const { createClient } = await import(
+        "https://esm.sh/@supabase/supabase-js@2"
+      );
       supabase = createClient(
         config.supabaseUrl,
         config.supabasePublishableKey
       );
+
+      const hasAuthCode = new URLSearchParams(location.search).has("code");
+      if (location.hash.includes("type=recovery") ||
+          (!location.hash.includes("access_token=") && !hasAuthCode)) return;
+
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      if (data.session?.access_token) {
+        showProfileEditor(data.user || data.session.user, data.session.access_token);
+      }
     }
 
     async function register() {
-      if (!supabase) {
-        message.textContent = "El servicio de correo todavía no está configurado.";
+      if (localMode) {
+        if (!form.reportValidity()) return;
+
+        try {
+          const response = await fetch("/api/local-auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: document.querySelector("#email").value.trim(),
+              password: passwordInput.value,
+              firstName: document.querySelector("#firstName").value.trim(),
+              lastName: document.querySelector("#lastName").value.trim(),
+              cedula: document.querySelector("#cedula").value.trim()
+            })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "No se pudo crear la cuenta.");
+          localStorage.setItem("hotelia-local-session", result.token);
+          showProfileEditor(result.user, result.token);
+        } catch (error) {
+          message.textContent = error.message || "No se pudo completar el registro. Inténtalo de nuevo.";
+        }
         return;
       }
+
+      if (!requireSupabase()) return;
 
       if (!form.reportValidity()) return;
 
-      const username = document.querySelector("#username").value.trim();
+      const firstName = document.querySelector("#firstName").value.trim();
+      const lastName = document.querySelector("#lastName").value.trim();
+      const cedula = document.querySelector("#cedula").value.trim();
       const email = document.querySelector("#email").value.trim();
-      const password = document.querySelector("#password").value;
-
-      if (username.length < 3) {
-        message.textContent = "El nombre debe tener al menos 3 caracteres.";
-        return;
-      }
 
       try {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
-          password,
+          password: passwordInput.value,
           options: {
-            data: { username },
+            data: { first_name: firstName, last_name: lastName, cedula },
             emailRedirectTo: `${location.origin}/login.html`
           }
         });
 
-        message.textContent = error
-          ? error.message
-          : "Registro enviado. Revisa tu correo y confirma la cuenta para poder iniciar sesión.";
+        if (error) {
+          message.textContent = error.message;
+          return;
+        }
+
+        if (data.session?.access_token) {
+          showProfileEditor(data.user || data.session.user, data.session.access_token);
+          return;
+        }
+
+        message.textContent = "Cuenta creada. Revisa tu correo para confirmar la dirección. Después inicia sesión para añadir tu foto de perfil.";
       } catch (error) {
         message.textContent = error.message || "No se pudo completar el registro. Inténtalo de nuevo.";
       }
@@ -121,10 +371,33 @@
 
     form.addEventListener("submit", async event => {
       event.preventDefault();
-      if (!supabase) {
-        message.textContent = "El servicio de correo todavía no está configurado.";
+      if (isRegistering) {
+        await register();
         return;
       }
+
+      if (localMode) {
+        if (!form.reportValidity()) return;
+        try {
+          const response = await fetch("/api/local-auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: document.querySelector("#email").value.trim(),
+              password: passwordInput.value
+            })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "No se pudo iniciar sesión.");
+          localStorage.setItem("hotelia-local-session", result.token);
+          showProfileEditor(result.user, result.token);
+        } catch (error) {
+          message.textContent = error.message || "No se pudo iniciar sesión. Inténtalo de nuevo.";
+        }
+        return;
+      }
+
+      if (!requireSupabase()) return;
 
       const email = document.querySelector("#email").value.trim();
       const password = document.querySelector("#password").value;
@@ -152,40 +425,51 @@
           return;
         }
 
-        message.textContent = "Inicio de sesión correcto.";
         const accessToken = data.session?.access_token;
         if (!accessToken) {
           message.textContent = "Iniciaste sesión, pero no se pudo validar tu sesión.";
           return;
         }
 
-        const adminResponse = await fetch("/api/admin/me", {
-          headers: {
-            Authorization: "Bearer " + accessToken
-          }
-        });
-
-        if (adminResponse.ok) {
-          location.href = "/admin.html";
-        } else if (adminResponse.status === 403) {
-          location.href = "/";
-        } else {
-          const result = await adminResponse.json().catch(() => ({}));
-          message.textContent = result.error ||
-            "Iniciaste sesión, pero no se pudo comprobar el acceso al panel.";
-        }
+        showProfileEditor(data.user, accessToken);
       } catch (error) {
         message.textContent = error.message || "No se pudo iniciar sesión. Inténtalo de nuevo.";
       }
     });
 
-    registerButton.addEventListener("click", register);
+    registerButton.addEventListener("click", () => {
+      setRegistrationMode(true);
+      document.querySelector("#firstName").focus();
+    });
 
-    resetButton.addEventListener("click", async () => {
-      if (!supabase) {
-        message.textContent = "El servicio de correo todavía no está configurado.";
+    backToLoginButton.addEventListener("click", () => setRegistrationMode(false));
+
+    emailSignInButton.addEventListener("click", async () => {
+      if (!requireSupabase()) return;
+
+      const email = document.querySelector("#email").value.trim();
+      if (!email) {
+        message.textContent = "Escribe tu correo para enviarte el enlace de acceso.";
+        document.querySelector("#email").focus();
         return;
       }
+
+      try {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: false }
+        });
+
+        message.textContent = error
+          ? error.message
+          : "Si el correo está registrado, recibirás un enlace para iniciar sesión.";
+      } catch (error) {
+        message.textContent = error.message || "No se pudo enviar el enlace. Inténtalo de nuevo.";
+      }
+    });
+
+    resetButton.addEventListener("click", async () => {
+      if (!requireSupabase()) return;
 
       const email = document.querySelector("#email").value.trim();
       if (!email) {
@@ -207,8 +491,63 @@
       }
     });
 
+    document.querySelector("#chooseAvatar").addEventListener("click", () => {
+      avatarFile.click();
+    });
+
+    avatarFile.addEventListener("change", async () => {
+      const file = avatarFile.files[0];
+      if (!file) return;
+
+      try {
+        selectedAvatar = await prepareAvatar(file);
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(selectedAvatar);
+        avatarPreview.src = previewUrl;
+        avatarPreview.hidden = false;
+        avatarPlaceholder.hidden = true;
+        avatarStatus.textContent = `Imagen seleccionada: ${file.name}`;
+        saveAvatarButton.disabled = false;
+      } catch (error) {
+        selectedAvatar = null;
+        saveAvatarButton.disabled = true;
+        avatarStatus.textContent = error.message ||
+          "No se pudo abrir la imagen seleccionada.";
+      }
+    });
+
+    saveAvatarButton.addEventListener("click", saveAvatar);
+
+    logoutButton.addEventListener("click", async () => {
+      logoutButton.disabled = true;
+      message.textContent = "Cerrando sesión...";
+      try {
+        if (localMode) {
+          const response = await fetch("/api/local-auth/logout", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + signedInToken }
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.error || "No se pudo cerrar la sesión.");
+          }
+          localStorage.removeItem("hotelia-local-session");
+        } else {
+          const { error } = await supabase.auth.signOut();
+          if (error) throw error;
+        }
+        location.replace("/login.html");
+      } catch (error) {
+        message.textContent = error.message ||
+          "No se pudo cerrar la sesión. Inténtalo de nuevo.";
+        logoutButton.disabled = false;
+      }
+    });
+
     initialize().catch(error => {
-      message.textContent = error.message;
+      authSetupError = error.message ||
+        "No se pudo inicializar Supabase. Revisa su configuración.";
+      message.textContent = authSetupError;
     });
   </script>
 </body>
