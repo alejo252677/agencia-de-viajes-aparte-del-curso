@@ -49,6 +49,7 @@
           <input id="hotelImage" type="url" maxlength="500"
             placeholder="https://ejemplo.com/hotel.jpg">
         </label>
+        <p class="auth-note">Usa únicamente fotografías reales, no generadas por IA, y revisa que tengas permiso para publicarlas.</p>
 
         <button class="primary" type="submit">Guardar hotel</button>
         <button id="cancelEdit" type="button">Cancelar edición</button>
@@ -273,7 +274,7 @@
     });
 
     initialize().catch(error => {
-      status.textContent = "No se pudo verificar el acceso.";
+      status.textContent = error.message || "No se pudo verificar el acceso.";
       console.error(error);
     });
   </script>
