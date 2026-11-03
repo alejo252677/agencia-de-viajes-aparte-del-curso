@@ -12,7 +12,7 @@
   <header class="topbar">
     <a class="brand" href="./index.html">Hotelia<span>.</span></a>
     <nav aria-label="Navegación principal">
-      <a href="#catalogo">Explorar viajes</a>
+      <a id="exploreFlightsLink" href="#flightMapSection">Explorar viajes</a>
       <a href="#reservaciones">Reservaciones <span id="navCartCount">0</span></a>
       <a href="./login.html">Mi cuenta</a>
     </nav>
@@ -69,7 +69,6 @@
         </label>
         <button class="primary search-submit" type="submit">Buscar</button>
       </form>
-      <p id="serviceHint" class="demo-note">Precios, rutas y servicios de ejemplo. No se procesan pagos ni se confirman reservas reales.</p>
     </section>
 
     <section class="content" id="catalogo">
@@ -88,6 +87,12 @@
             <option value="3000000">Hasta $3.000.000</option>
             <option value="5000000">Hasta $5.000.000</option>
             <option value="10000000">Hasta $10.000.000</option>
+          </select>
+        </label>
+        <label id="flightTripField" for="flightTripType" hidden>Tipo de viaje
+          <select id="flightTripType">
+            <option value="ida-vuelta" selected>Ida y vuelta</option>
+            <option value="ida">Ida</option>
           </select>
         </label>
       </div>
@@ -141,7 +146,6 @@
           </div>
           <button id="reserveButton" class="primary" type="button">Revisar reservaciones</button>
           <p id="reservationStatus" role="status" aria-live="polite"></p>
-          <p class="cart-disclaimer">El total es una estimación ficticia en COP. No incluye cobros ni confirma servicios.</p>
         </aside>
       </div>
     </section>
@@ -150,17 +154,15 @@
       <h2>¿Necesitas ayuda?</h2>
       <p>Escríbenos para consultar sobre las opciones de demostración.</p>
       <a id="whatsappLink" class="primary"
-         href="https://wa.me/573001234567"
+         href="https://wa.me/573244727759"
          target="_blank" rel="noopener noreferrer">
-        Contactar por WhatsApp
+        Contactar por WhatsApp: 3244727759
       </a>
     </section>
   </main>
 
   <footer>
     <a class="brand" href="./index.html">Hotelia<span>.</span></a>
-    <p>Catálogo de demostración: alojamientos, autos y vuelos con datos ficticios.</p>
-    <p>No se procesan pagos ni se confirman reservas reales.</p>
   </footer>
 </body>
 </html>
